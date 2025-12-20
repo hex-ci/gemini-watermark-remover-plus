@@ -22,6 +22,11 @@
 <details open>
 <summary>点击查看/收起示例</summary>
 　
+<p>无损 diff 示例</p>
+<p><img src="docs/lossless_diff.webp"></p>
+
+
+<p>示例图片</p>
 
 | 原图 | 去水印后 |
 | :---: | :----: |
