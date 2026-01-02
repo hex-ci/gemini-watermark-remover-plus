@@ -91,7 +91,7 @@ console.log(`🚀 Starting build process... [${isProd ? 'PRODUCTION' : 'DEVELOPM
 
 if (existsSync('dist')) rmSync('dist', { recursive: true });
 mkdirSync('dist/userscript', { recursive: true });
-  
+
 if (isProd) {
   await Promise.all([websiteCtx.rebuild(), userscriptCtx.rebuild()]);
   console.log('✅ Build complete!');

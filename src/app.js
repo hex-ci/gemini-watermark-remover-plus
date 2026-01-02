@@ -9,6 +9,9 @@ let engine = null;
 let imageQueue = [];
 let processedCount = 0;
 let zoom = null;
+let isCustomMode = false;
+let customPosition = null;
+let dragState = null;
 
 // dom elements references
 const uploadArea = document.getElementById('uploadArea');
@@ -26,6 +29,11 @@ const processedInfo = document.getElementById('processedInfo');
 const downloadBtn = document.getElementById('downloadBtn');
 const resetBtn = document.getElementById('resetBtn');
 
+// custom mode elements
+const toggleCustomBtn = document.getElementById('toggleCustomBtn');
+const watermarkOverlay = document.getElementById('watermarkOverlay');
+const watermarkBox = document.getElementById('watermarkBox');
+
 /**
  * initialize the application
  */
@@ -39,6 +47,7 @@ async function init() {
 
         hideLoading();
         setupEventListeners();
+        setupCustomMode();
 
         zoom = mediumZoom('[data-zoomable]', {
             margin: 24,
@@ -97,6 +106,15 @@ function reset() {
     imageQueue = [];
     processedCount = 0;
     fileInput.value = '';
+
+    // reset custom mode
+    isCustomMode = false;
+    customPosition = null;
+    toggleCustomBtn.style.display = 'none';
+    toggleCustomBtn.classList.remove('bg-emerald-50', 'text-emerald-600', 'border-emerald-200');
+    toggleCustomBtn.classList.add('bg-white', 'text-gray-600', 'border-gray-200');
+    watermarkOverlay.style.display = 'none';
+    if (zoom) zoom.attach('#originalImage');
 }
 
 function handleFileSelect(e) {
@@ -145,7 +163,7 @@ function handleFiles(files) {
     }
 }
 
-async function processSingle(item) {
+async function processSingle(item, scrollIntoView = true) {
     try {
         const img = await loadImage(item.file);
         item.originalImg = img;
@@ -163,7 +181,10 @@ async function processSingle(item) {
             <p>${i18n.t('info.position')}: (${watermarkInfo.position.x},${watermarkInfo.position.y})</p>
         `;
 
-        const result = await engine.removeWatermarkFromImage(img);
+        // show custom toggle button
+        toggleCustomBtn.style.display = 'flex';
+
+        const result = await engine.removeWatermarkFromImage(img, isCustomMode ? customPosition : null);
         const blob = await new Promise(resolve => result.toBlob(resolve, 'image/png'));
         item.processedBlob = blob;
 
@@ -181,7 +202,9 @@ async function processSingle(item) {
         zoom.detach();
         zoom.attach('[data-zoomable]');
 
-        processedSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        if (scrollIntoView) {
+            processedSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
     } catch (error) {
         console.error(error);
     }
@@ -309,3 +332,251 @@ async function downloadAll() {
 }
 
 init();
+
+/**
+ * setup custom mode event listeners
+ */
+function setupCustomMode() {
+    toggleCustomBtn.addEventListener('click', toggleCustomMode);
+
+    watermarkBox.addEventListener('mousedown', startDrag);
+    window.addEventListener('mousemove', onDrag);
+    window.addEventListener('mouseup', stopDrag);
+    window.addEventListener('keydown', handleKeyDown);
+
+    // Add window resize listener to update overlay position
+    window.addEventListener('resize', () => {
+        if (isCustomMode && customPosition) {
+            updateWatermarkOverlay(customPosition);
+        }
+    });
+}
+
+/**
+ * Toggle custom watermark mode
+ */
+function toggleCustomMode() {
+    isCustomMode = !isCustomMode;
+    const item = imageQueue[0];
+    if (!item || !item.originalImg) return;
+
+    if (isCustomMode) {
+        // Switch style
+        toggleCustomBtn.classList.remove('bg-white', 'text-gray-600', 'border-gray-200');
+        toggleCustomBtn.classList.add('bg-emerald-50', 'text-emerald-600', 'border-emerald-200');
+
+        // Show overlay
+        watermarkOverlay.style.display = 'block';
+        zoom.detach(); // detach zoom to prevent interference
+
+        // Initial position (use existing custom or default)
+        if (!customPosition) {
+            const info = engine.getWatermarkInfo(item.originalImg.width, item.originalImg.height);
+            customPosition = info.position;
+        }
+        updateWatermarkOverlay(customPosition);
+    } else {
+        // Revert style
+        toggleCustomBtn.classList.remove('bg-emerald-50', 'text-emerald-600', 'border-emerald-200');
+        toggleCustomBtn.classList.add('bg-white', 'text-gray-600', 'border-gray-200');
+
+        // Hide overlay
+        watermarkOverlay.style.display = 'none';
+        zoom.attach('#originalImage'); // re-attach zoom
+
+        // Clear custom position and re-process
+        customPosition = null;
+        processSingle(item);
+    }
+}
+
+/**
+ * Get image scale factor (Natural / Rendered)
+ */
+function getScaleFactor() {
+    const rect = originalImage.getBoundingClientRect();
+    if (rect.width === 0) return 1;
+    return originalImage.naturalWidth / rect.width;
+}
+
+/**
+ * Update watermark overlay position and size
+ * @param {Object} pos - position in image coordinates
+ */
+function updateWatermarkOverlay(pos) {
+    const scale = 1 / getScaleFactor();
+
+    watermarkBox.style.left = (pos.x * scale) + 'px';
+    watermarkBox.style.top = (pos.y * scale) + 'px';
+    watermarkBox.style.width = (pos.width * scale) + 'px';
+    watermarkBox.style.height = (pos.height * scale) + 'px';
+}
+
+/**
+ * Start dragging
+ */
+function startDrag(e) {
+    e.preventDefault();
+    if (!isCustomMode) return;
+
+    const scale = getScaleFactor();
+    const handle = e.target.getAttribute('data-handle');
+
+    dragState = {
+        startX: e.clientX,
+        startY: e.clientY,
+        startLeft: parseFloat(watermarkBox.style.left) || 0,
+        startTop: parseFloat(watermarkBox.style.top) || 0,
+        startWidth: parseFloat(watermarkBox.style.width) || 0,
+        startHeight: parseFloat(watermarkBox.style.height) || 0,
+        scale: scale,
+        handle: handle
+    };
+}
+
+/**
+ * On dragging
+ */
+function onDrag(e) {
+    if (!dragState) return;
+    e.preventDefault();
+
+    const deltaX = (e.clientX - dragState.startX); // Screen pixels
+    const deltaY = (e.clientY - dragState.startY);
+
+    if (dragState.handle) {
+        // Resizing
+        let newWidth = dragState.startWidth;
+        let newHeight = dragState.startHeight;
+        let newLeft = dragState.startLeft;
+        let newTop = dragState.startTop;
+
+        if (dragState.handle.includes('e')) {
+            newWidth = Math.max(20, dragState.startWidth + deltaX);
+        }
+        if (dragState.handle.includes('s')) {
+            newHeight = Math.max(20, dragState.startHeight + deltaY);
+        }
+        if (dragState.handle.includes('w')) {
+            const w = Math.max(20, dragState.startWidth - deltaX);
+            newLeft = dragState.startLeft + (dragState.startWidth - w);
+            newWidth = w;
+        }
+        if (dragState.handle.includes('n')) {
+            const h = Math.max(20, dragState.startHeight - deltaY);
+            newTop = dragState.startTop + (dragState.startHeight - h);
+            newHeight = h;
+        }
+
+        watermarkBox.style.width = newWidth + 'px';
+        watermarkBox.style.height = newHeight + 'px';
+        watermarkBox.style.left = newLeft + 'px';
+        watermarkBox.style.top = newTop + 'px';
+    } else {
+        // Moving
+        let newLeft = dragState.startLeft + deltaX;
+        let newTop = dragState.startTop + deltaY;
+
+        watermarkBox.style.left = newLeft + 'px';
+        watermarkBox.style.top = newTop + 'px';
+    }
+}
+
+/**
+ * Stop dragging
+ */
+function stopDrag() {
+    if (!dragState) return;
+    dragState = null;
+
+    // Update customPosition and process
+    const scale = getScaleFactor();
+
+    const domLeft = parseFloat(watermarkBox.style.left) || 0;
+    const domTop = parseFloat(watermarkBox.style.top) || 0;
+    const domWidth = parseFloat(watermarkBox.style.width) || 0;
+    const domHeight = parseFloat(watermarkBox.style.height) || 0;
+
+    customPosition = {
+        x: Math.round(domLeft * scale),
+        y: Math.round(domTop * scale),
+        width: Math.round(domWidth * scale),
+        height: Math.round(domHeight * scale)
+    };
+
+    // Ensure bounds
+    const item = imageQueue[0];
+    if (item && item.originalImg) {
+        customPosition.x = Math.max(0, Math.min(customPosition.x, item.originalImg.width - customPosition.width));
+        customPosition.y = Math.max(0, Math.min(customPosition.y, item.originalImg.height - customPosition.height));
+    }
+
+    // Trigger process
+    if (item) {
+        processSingle(item, false);
+    }
+}
+
+/**
+ * Handle keyboard navigation
+ */
+let processTimeout;
+function handleKeyDown(e) {
+    if (!isCustomMode || !customPosition) return;
+
+    // Check if key is relevant
+    if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) return;
+
+    e.preventDefault();
+
+    const step = 1;
+    let { x, y, width, height } = customPosition;
+
+    if (e.shiftKey) {
+        // Resize
+        switch (e.key) {
+            case 'ArrowUp': height -= step; break;
+            case 'ArrowDown': height += step; break;
+            case 'ArrowLeft': width -= step; break;
+            case 'ArrowRight': width += step; break;
+        }
+    } else {
+        // Move
+        switch (e.key) {
+            case 'ArrowUp': y -= step; break;
+            case 'ArrowDown': y += step; break;
+            case 'ArrowLeft': x -= step; break;
+            case 'ArrowRight': x += step; break;
+        }
+    }
+
+    // Ensure bounds and minimum size
+    const item = imageQueue[0];
+    if (item && item.originalImg) {
+        // Minimum size 20x20
+        width = Math.max(20, width);
+        height = Math.max(20, height);
+
+        // Ensure within image bounds
+        // If moving, we clamp x,y so box stays inside
+        if (!e.shiftKey) {
+            x = Math.max(0, Math.min(x, item.originalImg.width - width));
+            y = Math.max(0, Math.min(y, item.originalImg.height - height));
+        } else {
+            // If resizing, we just clamp width/height to not exceed image
+            width = Math.min(width, item.originalImg.width - x);
+            height = Math.min(height, item.originalImg.height - y);
+        }
+    }
+
+    customPosition = { x, y, width, height };
+    updateWatermarkOverlay(customPosition);
+
+    // Debounce processing
+    if (processTimeout) clearTimeout(processTimeout);
+    processTimeout = setTimeout(() => {
+        if (item) {
+            processSingle(item, false);
+        }
+    }, 50);
+}

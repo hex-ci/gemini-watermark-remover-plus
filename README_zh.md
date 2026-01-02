@@ -1,11 +1,11 @@
 [English](README.md)
 
-# Gemini 无损去水印工具 - [banana.ovo.re](https://banana.ovo.re)
+# Gemini 无损去水印工具增强版
 
 基于 Javascript 的纯浏览器端 Gemini AI 图像无损去水印工具，使用数学精确的反向 Alpha 混合算法
 
 <p align="center">
-  <img src="https://count.getloli.com/@gemini-watermark-remover?name=gemini-watermark-remover&theme=minecraft&padding=7&offset=0&align=top&scale=1&pixelated=1&darkmode=auto" width="400">
+  <img src="https://count.getloli.com/@gemini-watermark-remover-plus?name=gemini-watermark-remover-plus&theme=minecraft&padding=7&offset=0&align=top&scale=1&pixelated=1&darkmode=auto" width="400">
 </p>
 
 ## 特性
@@ -15,6 +15,7 @@
 - ✅ **数学精确** - 基于反向 Alpha 混合算法，非 AI 模型
 - ✅ **自动检测** - 自动识别 48×48 或 96×96 水印尺寸
 - ✅ **易于使用** - 拖拽选择图片，一键处理
+- ✅ **自定义区域** - 支持手动框选，可通过键盘精确控制（方向键移动，Shift+方向键缩放）
 - ✅ **跨平台** - 支持所有现代浏览器
 
 ## 效果示例
@@ -117,7 +118,7 @@ $$original = \frac{watermarked - \alpha \cdot logo}{1 - \alpha}$$
 ## 项目结构
 
 ```
-gemini-watermark-remover/
+gemini-watermark-remover-plus/
 ├── public/
 │   ├── index.html         # 主页面
 │   └── terms.html         # 使用条款页面

@@ -1,11 +1,11 @@
 [中文文档](README_zh.md)
 
-# Gemini Lossless Watermark Remover - [banana.ovo.re](https://banana.ovo.re)
+# Gemini Lossless Watermark Remover Plus
 
 A high-performance, 100% client-side tool for removing Gemini AI watermarks. Built with pure JavaScript, it leverages a mathematically precise **Reverse Alpha Blending** algorithm rather than unpredictable AI inpainting.
 
 <p align="center">
-  <img src="https://count.getloli.com/@gemini-watermark-remover?name=gemini-watermark-remover&theme=minecraft&padding=7&offset=0&align=top&scale=1&pixelated=1&darkmode=auto" width="400">
+  <img src="https://count.getloli.com/@gemini-watermark-remover-plus?name=gemini-watermark-remover-plus&theme=minecraft&padding=7&offset=0&align=top&scale=1&pixelated=1&darkmode=auto" width="400">
 </p>
 
 ## Features
@@ -15,6 +15,7 @@ A high-performance, 100% client-side tool for removing Gemini AI watermarks. Bui
 - ✅ **Mathematical Precision** - Based on the Reverse Alpha Blending formula, not "hallucinating" AI models.
 - ✅ **Auto-Detection** - Intelligent recognition of 48×48 or 96×96 watermark variants.
 - ✅ **User Friendly** - Simple drag-and-drop interface with instant processing.
+- ✅ **Custom Area** - Precise manual control with resizable selection box and keyboard navigation (Arrow keys to move, Shift+Arrow to resize).
 - ✅ **Cross-Platform** - Runs smoothly on all modern web browsers.
 
 ## Examples
@@ -118,7 +119,7 @@ By capturing the watermark on a known solid background, we reconstruct the exact
 ## Project Structure
 
 ```text
-gemini-watermark-remover/
+gemini-watermark-remover-plus/
 ├── public/
 │   ├── index.html         # Main page
 │   └── terms.html         # Terms of Service page
@@ -197,7 +198,7 @@ Required APIs:
 
 ## Legal Disclaimer
 
-This tool is provided for **personal and educational use only**. 
+This tool is provided for **personal and educational use only**.
 
 The removal of watermarks may have legal implications depending on your jurisdiction and the intended use of the images. Users are solely responsible for ensuring their use of this tool complies with applicable laws, terms of service, and intellectual property rights.
 

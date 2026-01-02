@@ -82,33 +82,39 @@ export class WatermarkEngine {
     }
 
     /**
-     * Get alpha map from background captured image based on watermark size
-     * @param {number} size - Watermark size (48 or 96)
+     * Get alpha map from background captured image based on watermark dimensions
+     * @param {number} width - Watermark width
+     * @param {number} height - Watermark height (optional, defaults to width)
      * @returns {Promise<Float32Array>} Alpha map
      */
-    async getAlphaMap(size) {
+    async getAlphaMap(width, height = width) {
+        const cacheKey = `${width}x${height}`;
+
         // If cached, return directly
-        if (this.alphaMaps[size]) {
-            return this.alphaMaps[size];
+        if (this.alphaMaps[cacheKey]) {
+            return this.alphaMaps[cacheKey];
         }
 
         // Select corresponding background capture based on watermark size
-        const bgImage = size === 48 ? this.bgCaptures.bg48 : this.bgCaptures.bg96;
+        // Heuristic: use bg96 if larger dimension > 72, otherwise bg48
+        const bgImage = Math.max(width, height) > 72 ? this.bgCaptures.bg96 : this.bgCaptures.bg48;
 
         // Create temporary canvas to extract ImageData
         const canvas = document.createElement('canvas');
-        canvas.width = size;
-        canvas.height = size;
+        canvas.width = width;
+        canvas.height = height;
         const ctx = canvas.getContext('2d');
-        ctx.drawImage(bgImage, 0, 0);
 
-        const imageData = ctx.getImageData(0, 0, size, size);
+        // Draw and scale background image
+        ctx.drawImage(bgImage, 0, 0, width, height);
+
+        const imageData = ctx.getImageData(0, 0, width, height);
 
         // Calculate alpha map
         const alphaMap = calculateAlphaMap(imageData);
 
         // Cache result
-        this.alphaMaps[size] = alphaMap;
+        this.alphaMaps[cacheKey] = alphaMap;
 
         return alphaMap;
     }
@@ -116,9 +122,10 @@ export class WatermarkEngine {
     /**
      * Remove watermark from image based on watermark size
      * @param {HTMLImageElement|HTMLCanvasElement} image - Input image
+     * @param {Object} [customPosition] - Optional custom watermark position {x, y, width, height}
      * @returns {Promise<HTMLCanvasElement>} Processed canvas
      */
-    async removeWatermarkFromImage(image) {
+    async removeWatermarkFromImage(image, customPosition = null) {
         // Create canvas to process image
         const canvas = document.createElement('canvas');
         canvas.width = image.width;
@@ -131,12 +138,18 @@ export class WatermarkEngine {
         // Get image data
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-        // Detect watermark configuration
-        const config = detectWatermarkConfig(canvas.width, canvas.height);
-        const position = calculateWatermarkPosition(canvas.width, canvas.height, config);
+        let position;
+
+        if (customPosition) {
+            position = customPosition;
+        } else {
+            // Detect watermark configuration
+            const config = detectWatermarkConfig(canvas.width, canvas.height);
+            position = calculateWatermarkPosition(canvas.width, canvas.height, config);
+        }
 
         // Get alpha map for watermark size
-        const alphaMap = await this.getAlphaMap(config.logoSize);
+        const alphaMap = await this.getAlphaMap(position.width, position.height);
 
         // Remove watermark from image data
         removeWatermark(imageData, alphaMap, position);
